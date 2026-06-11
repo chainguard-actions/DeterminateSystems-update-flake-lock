@@ -1,1 +1,15 @@
-# DeterminateSystems-update-flake-lock
+# DeterminateSystems/update-flake-lock
+
+Update your Nix flake.lock and send a PR
+
+Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/DeterminateSystems/update-flake-lock](https://github.com/DeterminateSystems/update-flake-lock).
+
+## Versions
+
+| Version | Tag | Upstream commit |
+|---------|-----|-----------------|
+| v28 | [`v28`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v28) | [`834c491`](https://github.com/DeterminateSystems/update-flake-lock/commit/834c491b2ece4de0bbd00d85214bb5e83b4da5c6) |
+
+## Privacy
+
+This Action contacts Chainguard's licensing server to verify authorization. Connection metadata (IP address, GitHub repository identifier, timestamp, and any metadata encoded in the auth token) is transmitted to Chainguard, Inc. even if authorization is denied in accordance with our [Privacy Notice](https://www.chainguard.dev/legal/privacy-notice)
