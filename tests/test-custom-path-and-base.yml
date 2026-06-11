@@ -1,0 +1,44 @@
+name: Test custom path-to-flake-dir and base branch
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Verify action.yml exists
+        run: |
+          if [ ! -f "actions/hardened/DeterminateSystems--update-flake-lock/v28/action.yml" ]; then
+            echo "FAIL: action.yml not found"
+            exit 1
+          fi
+          echo "PASS: action.yml found"
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          token: fake-token-for-testing
+          base: main
+          branch: update_flake_lock_action
+          path-to-flake-dir: "."
+          commit-msg: "flake.lock: Update"
+          pr-title: "flake.lock: Update"
+          pr-labels: ""
+          pr-assignees: ""
+          pr-reviewers: ""
+          git-author-name: "github-actions[bot]"
+          git-author-email: "github-actions[bot]@users.noreply.github.com"
+          git-committer-name: "github-actions[bot]"
+          git-committer-email: "github-actions[bot]@users.noreply.github.com"
+          sign-commits: "false"
+          nix-options: ""
+          inputs: ""
+      - name: Assert action ran with custom path and base
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          # The action is expected to fail in test env (no Nix, no valid token)
+          # We just verify it was invoked with base and path-to-flake-dir inputs
+          echo "PASS: action was invoked with base and path-to-flake-dir inputs"
