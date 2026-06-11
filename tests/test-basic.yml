@@ -1,0 +1,37 @@
+name: Test basic usage (unsigned commits)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Verify unsigned commit env vars are set by action
+        id: action
+        uses: .
+        with:
+          token: ${{ github.token }}
+          commit-msg: "flake.lock: Update test"
+          pr-title: "flake.lock: Update test"
+          branch: "test-update-flake-lock-basic"
+          git-author-name: "test-bot"
+          git-author-email: "test-bot@example.com"
+          git-committer-name: "test-bot"
+          git-committer-email: "test-bot@example.com"
+        continue-on-error: true
+      - name: Assert action ran (env vars set correctly)
+        run: |
+          echo "GIT_AUTHOR_NAME: $GIT_AUTHOR_NAME"
+          echo "GIT_COMMITTER_NAME: $GIT_COMMITTER_NAME"
+          if [ "$GIT_AUTHOR_NAME" != "test-bot" ]; then
+            echo "FAIL: expected GIT_AUTHOR_NAME to be 'test-bot', got '$GIT_AUTHOR_NAME'"
+            exit 1
+          fi
+          if [ "$GIT_COMMITTER_NAME" != "test-bot" ]; then
+            echo "FAIL: expected GIT_COMMITTER_NAME to be 'test-bot', got '$GIT_COMMITTER_NAME'"
+            exit 1
+          fi
+          echo "PASS: git identity env vars set correctly"

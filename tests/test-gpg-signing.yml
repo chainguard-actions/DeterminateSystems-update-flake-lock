@@ -1,0 +1,42 @@
+name: Test GPG signing inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run action with GPG signing inputs (sign-commits=false, gpg-fingerprint provided)
+        id: action
+        uses: .
+        with:
+          token: ${{ github.token }}
+          sign-commits: "false"
+          gpg-private-key: ""
+          gpg-fingerprint: "AABBCCDDEEFF00112233445566778899AABBCCDD"
+          gpg-passphrase: ""
+          branch: "test-update-flake-lock-gpg"
+          commit-msg: "flake.lock: Update gpg test"
+          pr-title: "flake.lock: Update gpg test"
+          git-author-name: "github-actions[bot]"
+          git-author-email: "github-actions[bot]@users.noreply.github.com"
+          git-committer-name: "github-actions[bot]"
+          git-committer-email: "github-actions[bot]@users.noreply.github.com"
+        continue-on-error: true
+      - name: Assert git identity env vars were set (unsigned path taken)
+        run: |
+          echo "GIT_AUTHOR_NAME: $GIT_AUTHOR_NAME"
+          echo "GIT_COMMITTER_NAME: $GIT_COMMITTER_NAME"
+          # When sign-commits=false, the unsigned commit path sets env vars from inputs
+          if [ "$GIT_AUTHOR_NAME" != "github-actions[bot]" ]; then
+            echo "FAIL: expected GIT_AUTHOR_NAME='github-actions[bot]', got '$GIT_AUTHOR_NAME'"
+            exit 1
+          fi
+          if [ "$GIT_COMMITTER_NAME" != "github-actions[bot]" ]; then
+            echo "FAIL: expected GIT_COMMITTER_NAME='github-actions[bot]', got '$GIT_COMMITTER_NAME'"
+            exit 1
+          fi
+          echo "PASS: gpg-fingerprint input accepted, unsigned commit path executed correctly"

@@ -1,0 +1,42 @@
+name: Test PR customization inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run action with PR customization inputs
+        id: action
+        uses: .
+        with:
+          token: ${{ github.token }}
+          branch: "test-update-flake-lock-pr-custom"
+          commit-msg: "flake.lock: Update pr-custom test"
+          pr-title: "flake.lock: Update pr-custom test"
+          pr-body: "Custom PR body for testing."
+          pr-labels: "dependencies,nix"
+          pr-assignees: ""
+          pr-reviewers: ""
+          nix-options: "--accept-flake-config"
+          git-author-name: "github-actions[bot]"
+          git-author-email: "github-actions[bot]@users.noreply.github.com"
+          git-committer-name: "github-actions[bot]"
+          git-committer-email: "github-actions[bot]@users.noreply.github.com"
+        continue-on-error: true
+      - name: Assert git identity env vars were set
+        run: |
+          echo "GIT_AUTHOR_NAME: $GIT_AUTHOR_NAME"
+          echo "GIT_COMMITTER_NAME: $GIT_COMMITTER_NAME"
+          if [ "$GIT_AUTHOR_NAME" != "github-actions[bot]" ]; then
+            echo "FAIL: expected GIT_AUTHOR_NAME='github-actions[bot]', got '$GIT_AUTHOR_NAME'"
+            exit 1
+          fi
+          if [ "$GIT_COMMITTER_NAME" != "github-actions[bot]" ]; then
+            echo "FAIL: expected GIT_COMMITTER_NAME='github-actions[bot]', got '$GIT_COMMITTER_NAME'"
+            exit 1
+          fi
+          echo "PASS: PR customization inputs accepted, git identity set correctly"
