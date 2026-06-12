@@ -8,6 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
+| v25 | [`v25`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v25) | [`428c2b5`](https://github.com/DeterminateSystems/update-flake-lock/commit/428c2b58a4b7414dabd372acb6a03dba1084d3ab) |
 | v26 | [`v26`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v26) | [`9070c89`](https://github.com/DeterminateSystems/update-flake-lock/commit/9070c8924674eb79cc49246b8b6f2e14f4378eb0) |
 | v28 | [`v28`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v28) | [`834c491`](https://github.com/DeterminateSystems/update-flake-lock/commit/834c491b2ece4de0bbd00d85214bb5e83b4da5c6) |
 
