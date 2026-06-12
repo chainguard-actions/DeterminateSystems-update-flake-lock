@@ -1,0 +1,72 @@
+name: Test with path-to-flake-dir input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a minimal flake directory structure
+        run: |
+          mkdir -p nix-config
+          cat > nix-config/flake.nix << 'EOF'
+          {
+            description = "Test flake";
+            inputs = {};
+            outputs = { self }: {};
+          }
+          EOF
+          echo "Created nix-config/flake.nix"
+
+      - name: Assert flake directory was created
+        run: |
+          if [ ! -f "nix-config/flake.nix" ]; then
+            echo "FAIL: nix-config/flake.nix not found"
+            exit 1
+          fi
+          echo "PASS: nix-config/flake.nix exists"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path-to-flake-dir: "nix-config"
+          commit-msg: "flake.lock: Update"
+          branch: "update_flake_lock_action"
+          pr-title: "flake.lock: Update"
+          git-author-name: "github-actions[bot]"
+          git-author-email: "github-actions[bot]@users.noreply.github.com"
+          git-committer-name: "github-actions[bot]"
+          git-committer-email: "github-actions[bot]@users.noreply.github.com"
+          sign-commits: "false"
+
+      - name: Assert GIT_AUTHOR_NAME was set by action env setup
+        run: |
+          echo "GIT_AUTHOR_NAME: '${GIT_AUTHOR_NAME}'"
+          if [ -z "$GIT_AUTHOR_NAME" ]; then
+            echo "FAIL: GIT_AUTHOR_NAME is empty — action env setup did not run"
+            exit 1
+          fi
+          echo "PASS: GIT_AUTHOR_NAME is set"
+
+      - name: Assert GIT_COMMITTER_NAME was set by action env setup
+        run: |
+          echo "GIT_COMMITTER_NAME: '${GIT_COMMITTER_NAME}'"
+          if [ -z "$GIT_COMMITTER_NAME" ]; then
+            echo "FAIL: GIT_COMMITTER_NAME is empty"
+            exit 1
+          fi
+          echo "PASS: GIT_COMMITTER_NAME is set"
+
+      - name: Assert GIT_COMMITTER_EMAIL contains expected value
+        run: |
+          echo "GIT_COMMITTER_EMAIL: '${GIT_COMMITTER_EMAIL}'"
+          if [[ "$GIT_COMMITTER_EMAIL" != *"github-actions[bot]"* ]]; then
+            echo "FAIL: GIT_COMMITTER_EMAIL does not contain 'github-actions[bot]'"
+            exit 1
+          fi
+          echo "PASS"
