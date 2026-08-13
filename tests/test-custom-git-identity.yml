@@ -1,0 +1,68 @@
+name: Test custom git author and committer identity
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          git-author-name: "my-bot"
+          git-author-email: "my-bot@example.com"
+          git-committer-name: "my-bot"
+          git-committer-email: "my-bot@example.com"
+          token: "dummy-token"
+
+      - name: Assert custom GIT_AUTHOR_NAME
+        run: |
+          echo "GIT_AUTHOR_NAME: $GIT_AUTHOR_NAME"
+          if [ "$GIT_AUTHOR_NAME" != "my-bot" ]; then
+            echo "FAIL: expected 'my-bot', got '$GIT_AUTHOR_NAME'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert custom GIT_AUTHOR_EMAIL has angle brackets
+        run: |
+          echo "GIT_AUTHOR_EMAIL: $GIT_AUTHOR_EMAIL"
+          if [ "$GIT_AUTHOR_EMAIL" != "<my-bot@example.com>" ]; then
+            echo "FAIL: expected '<my-bot@example.com>', got '$GIT_AUTHOR_EMAIL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert custom GIT_COMMITTER_NAME
+        run: |
+          echo "GIT_COMMITTER_NAME: $GIT_COMMITTER_NAME"
+          if [ "$GIT_COMMITTER_NAME" != "my-bot" ]; then
+            echo "FAIL: expected 'my-bot', got '$GIT_COMMITTER_NAME'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert custom GIT_COMMITTER_EMAIL has angle brackets
+        run: |
+          echo "GIT_COMMITTER_EMAIL: $GIT_COMMITTER_EMAIL"
+          if [ "$GIT_COMMITTER_EMAIL" != "<my-bot@example.com>" ]; then
+            echo "FAIL: expected '<my-bot@example.com>', got '$GIT_COMMITTER_EMAIL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert committer string format is correct
+        run: |
+          COMMITTER_STRING="$GIT_COMMITTER_NAME $GIT_COMMITTER_EMAIL"
+          echo "Committer string: $COMMITTER_STRING"
+          EXPECTED="my-bot <my-bot@example.com>"
+          if [ "$COMMITTER_STRING" != "$EXPECTED" ]; then
+            echo "FAIL: expected '$EXPECTED', got '$COMMITTER_STRING'"
+            exit 1
+          fi
+          echo "PASS: committer string format is correct"

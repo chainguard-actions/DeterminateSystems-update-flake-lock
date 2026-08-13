@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  typescript-action:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Check Nixpkgs
+        uses: DeterminateSystems/flake-checker-action@de924abd783455e8429c858962b9e43062d19da1 # main
+        with:
+          fail-mode: true
+      - name: Install Determinate Nix
+        uses: DeterminateSystems/determinate-nix-action@d96678350ffd6a456235832eb11e1c491589b7bb # v3
+      - name: Enable FlakeHub Cache
+        uses: DeterminateSystems/flakehub-cache-action@77c6bddd7d747943530aaa578c57f233ee5d920e # main
+      - name: Install pnpm dependencies
+        run: nix develop --command pnpm install
+      - name: Check formatting
+        run: nix develop --command pnpm run check-fmt
+      - name: Lint
+        run: nix develop --command pnpm run lint
+      - name: Build
+        run: nix develop --command pnpm run build
+      - name: Run test suite
+        run: nix develop --command pnpm run test
+      - name: Package
+        run: nix develop --command pnpm run package
+      - name: Check git status
+        run: git status --porcelain=v1
+      - name: Ensure no staged changes
+        run: git diff --exit-code

@@ -1,4 +1,4 @@
-name: Test basic usage (no Nix installed)
+name: Test path-to-flake-dir input
 on:
   workflow_dispatch:
 jobs:
@@ -7,19 +7,20 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # Set up a minimal flake.nix and flake.lock so the action has something to work with
-      - name: Create minimal flake files
+      # Create a flake in a subdirectory to test path-to-flake-dir
+      - name: Create flake files in subdirectory
         run: |
-          cat > flake.nix << 'EOF'
+          mkdir -p nix-config
+          cat > nix-config/flake.nix << 'EOF'
           {
-            description = "Test flake";
+            description = "Test flake in subdirectory";
             inputs = {
               nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
             };
             outputs = { self, nixpkgs }: {};
           }
           EOF
-          cat > flake.lock << 'EOF'
+          cat > nix-config/flake.lock << 'EOF'
           {
             "nodes": {
               "nixpkgs": {
@@ -49,24 +50,25 @@ jobs:
           }
           EOF
 
-      # The action requires Nix; without it, it should fail with a clear error.
-      # We use continue-on-error to capture the failure and assert on it.
+      # Test with path-to-flake-dir pointing to the subdirectory
       - id: action
         uses: .
         continue-on-error: true
         with:
           token: ${{ github.token }}
+          path-to-flake-dir: "nix-config"
           commit-msg: "flake.lock: Update"
           pr-title: "flake.lock: Update"
 
-      - name: Assert action failed due to missing Nix
+      - name: Assert action ran with path-to-flake-dir
         env:
           OUTCOME: ${{ steps.action.outcome }}
         run: |
           echo "outcome: $OUTCOME"
           # The action should fail because Nix is not installed
+          # but it should have accepted the path-to-flake-dir input correctly
           if [ "$OUTCOME" != "failure" ]; then
             echo "FAIL: expected action to fail (Nix not installed), but got outcome: $OUTCOME"
             exit 1
           fi
-          echo "PASS: action correctly failed when Nix is not available"
+          echo "PASS: action correctly accepted path-to-flake-dir input and failed at Nix step"
