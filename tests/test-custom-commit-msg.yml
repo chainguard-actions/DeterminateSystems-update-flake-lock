@@ -1,4 +1,4 @@
-name: Test basic flake lock update
+name: Test custom commit message and PR title
 on:
   workflow_dispatch:
 jobs:
@@ -58,44 +58,60 @@ jobs:
       - name: Install mock nix binary
         run: |
           mkdir -p "$HOME/.local/bin"
+          # Capture the args passed to nix so we can assert on them
           cat > "$HOME/.local/bin/nix" << 'EOF'
           #!/bin/sh
-          # Mock nix binary that simulates a successful flake update
-          echo "Mock nix called with args: $*"
-          # Simulate nix flake update by touching flake.lock
+          echo "Mock nix called with args: $*" >&2
+          # Write args to a file for later inspection
+          echo "$*" > /tmp/nix_args.txt
+          # Simulate nix flake update
           if echo "$*" | grep -q "flake"; then
             touch flake.lock
             git add flake.lock 2>/dev/null || true
-            git commit --allow-empty -m "flake.lock: Update" 2>/dev/null || true
+            git commit --allow-empty -m "chore: bump nixpkgs to latest" 2>/dev/null || true
           fi
           exit 0
           EOF
           chmod +x "$HOME/.local/bin/nix"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Verify mock nix is on PATH
-        run: |
-          which nix
-          nix --version || true
-
       - id: action
         uses: .
         with:
           token: ${{ github.token }}
-          commit-msg: "flake.lock: Update"
-          pr-title: "flake.lock: Update"
-          branch: "update_flake_lock_test_basic"
+          commit-msg: "chore: bump nixpkgs to latest"
+          pr-title: "chore: bump nixpkgs to latest"
+          pr-body: "Automated flake lock update."
+          branch: "update_flake_lock_test_custom_msg"
         continue-on-error: true
 
-      - name: Assert action ran without unexpected errors
+      - name: Assert nix was called with correct commit message
+        run: |
+          echo "Checking nix args..."
+          if [ -f /tmp/nix_args.txt ]; then
+            NIX_ARGS="$(cat /tmp/nix_args.txt)"
+            echo "nix args: $NIX_ARGS"
+            if echo "$NIX_ARGS" | grep -q "commit-lockfile-summary"; then
+              echo "PASS: nix was called with commit-lockfile-summary flag"
+            else
+              echo "FAIL: nix was not called with commit-lockfile-summary flag"
+              exit 1
+            fi
+            if echo "$NIX_ARGS" | grep -q "bump nixpkgs to latest"; then
+              echo "PASS: nix was called with custom commit message"
+            else
+              echo "FAIL: nix was not called with custom commit message"
+              exit 1
+            fi
+          else
+            echo "WARN: /tmp/nix_args.txt not found - nix may not have been called"
+          fi
+
+      - name: Assert action completed
         env:
           OUTCOME: ${{ steps.action.outcome }}
         run: |
           echo "Action outcome: $OUTCOME"
-          # The action may succeed or fail depending on whether it can create a PR
-          # (no actual changes were made by mock nix). Either way, it should not
-          # crash with an unhandled error - success or failure are both valid outcomes
-          # when no flake changes are detected.
           if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
             echo "PASS: action completed with outcome: $OUTCOME"
           else

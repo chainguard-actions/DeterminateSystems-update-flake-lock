@@ -1,4 +1,4 @@
-name: Test basic flake lock update
+name: Test nix-options passthrough
 on:
   workflow_dispatch:
 jobs:
@@ -60,9 +60,10 @@ jobs:
           mkdir -p "$HOME/.local/bin"
           cat > "$HOME/.local/bin/nix" << 'EOF'
           #!/bin/sh
-          # Mock nix binary that simulates a successful flake update
-          echo "Mock nix called with args: $*"
-          # Simulate nix flake update by touching flake.lock
+          echo "Mock nix called with args: $*" >&2
+          # Write args to a file for later inspection
+          echo "$*" > /tmp/nix_args.txt
+          # Simulate nix flake update
           if echo "$*" | grep -q "flake"; then
             touch flake.lock
             git add flake.lock 2>/dev/null || true
@@ -73,29 +74,44 @@ jobs:
           chmod +x "$HOME/.local/bin/nix"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Verify mock nix is on PATH
-        run: |
-          which nix
-          nix --version || true
-
       - id: action
         uses: .
         with:
           token: ${{ github.token }}
+          nix-options: "--extra-substituters https://cache.nixos.org"
           commit-msg: "flake.lock: Update"
           pr-title: "flake.lock: Update"
-          branch: "update_flake_lock_test_basic"
+          branch: "update_flake_lock_test_nix_options"
         continue-on-error: true
 
-      - name: Assert action ran without unexpected errors
+      - name: Assert nix was called with extra options
+        run: |
+          echo "Checking nix args for extra options..."
+          if [ -f /tmp/nix_args.txt ]; then
+            NIX_ARGS="$(cat /tmp/nix_args.txt)"
+            echo "nix args: $NIX_ARGS"
+            # nix-options should be prepended before "flake update"
+            if echo "$NIX_ARGS" | grep -q "extra-substituters"; then
+              echo "PASS: --extra-substituters option was passed to nix"
+            else
+              echo "FAIL: --extra-substituters option was not found in: $NIX_ARGS"
+              exit 1
+            fi
+            if echo "$NIX_ARGS" | grep -q "cache.nixos.org"; then
+              echo "PASS: cache URL was passed to nix"
+            else
+              echo "FAIL: cache URL was not found in: $NIX_ARGS"
+              exit 1
+            fi
+          else
+            echo "WARN: /tmp/nix_args.txt not found - nix may not have been called"
+          fi
+
+      - name: Assert action completed
         env:
           OUTCOME: ${{ steps.action.outcome }}
         run: |
           echo "Action outcome: $OUTCOME"
-          # The action may succeed or fail depending on whether it can create a PR
-          # (no actual changes were made by mock nix). Either way, it should not
-          # crash with an unhandled error - success or failure are both valid outcomes
-          # when no flake changes are detected.
           if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
             echo "PASS: action completed with outcome: $OUTCOME"
           else

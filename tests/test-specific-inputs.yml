@@ -1,0 +1,145 @@
+name: Test updating specific flake inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up git config
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Create a minimal flake.nix and flake.lock with multiple inputs
+        run: |
+          cat > flake.nix << 'EOF'
+          {
+            description = "Test flake with multiple inputs";
+            inputs = {
+              nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+              flake-utils.url = "github:numtide/flake-utils";
+            };
+            outputs = { self, nixpkgs, flake-utils }: {};
+          }
+          EOF
+
+          cat > flake.lock << 'EOF'
+          {
+            "nodes": {
+              "flake-utils": {
+                "locked": {
+                  "lastModified": 1700000001,
+                  "narHash": "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+                  "owner": "numtide",
+                  "repo": "flake-utils",
+                  "rev": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "type": "github"
+                },
+                "original": {
+                  "owner": "numtide",
+                  "repo": "flake-utils",
+                  "type": "github"
+                }
+              },
+              "nixpkgs": {
+                "locked": {
+                  "lastModified": 1700000000,
+                  "narHash": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                  "owner": "NixOS",
+                  "repo": "nixpkgs",
+                  "rev": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "type": "github"
+                },
+                "original": {
+                  "owner": "NixOS",
+                  "ref": "nixos-unstable",
+                  "repo": "nixpkgs",
+                  "type": "github"
+                }
+              },
+              "root": {
+                "inputs": {
+                  "flake-utils": "flake-utils",
+                  "nixpkgs": "nixpkgs"
+                }
+              }
+            },
+            "root": "root",
+            "version": 7
+          }
+          EOF
+
+          git add flake.nix flake.lock
+          git commit -m "Add test flake files with multiple inputs"
+
+      - name: Install mock nix binary
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/nix" << 'EOF'
+          #!/bin/sh
+          echo "Mock nix called with args: $*" >&2
+          # Write args to a file for later inspection
+          echo "$*" > /tmp/nix_args.txt
+          # Simulate nix flake lock with specific input update
+          if echo "$*" | grep -q "flake"; then
+            touch flake.lock
+            git add flake.lock 2>/dev/null || true
+            git commit --allow-empty -m "flake.lock: Update" 2>/dev/null || true
+          fi
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/nix"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - id: action
+        uses: .
+        with:
+          token: ${{ github.token }}
+          inputs: "nixpkgs"
+          commit-msg: "flake.lock: Update nixpkgs"
+          pr-title: "flake.lock: Update nixpkgs"
+          branch: "update_flake_lock_test_specific_inputs"
+        continue-on-error: true
+
+      - name: Assert nix was called with --update-input flag for specific input
+        run: |
+          echo "Checking nix args for specific input update..."
+          if [ -f /tmp/nix_args.txt ]; then
+            NIX_ARGS="$(cat /tmp/nix_args.txt)"
+            echo "nix args: $NIX_ARGS"
+            # When specific inputs are given, nix flake lock --update-input <input> is used
+            if echo "$NIX_ARGS" | grep -q "lock"; then
+              echo "PASS: nix flake lock was used (correct for specific input updates)"
+            else
+              echo "FAIL: expected 'nix flake lock' but got: $NIX_ARGS"
+              exit 1
+            fi
+            if echo "$NIX_ARGS" | grep -q "update-input"; then
+              echo "PASS: --update-input flag was used"
+            else
+              echo "FAIL: --update-input flag was not found in: $NIX_ARGS"
+              exit 1
+            fi
+            if echo "$NIX_ARGS" | grep -q "nixpkgs"; then
+              echo "PASS: nixpkgs input was specified"
+            else
+              echo "FAIL: nixpkgs input was not found in: $NIX_ARGS"
+              exit 1
+            fi
+          else
+            echo "WARN: /tmp/nix_args.txt not found - nix may not have been called"
+          fi
+
+      - name: Assert action completed
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "Action outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action completed with outcome: $OUTCOME"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi

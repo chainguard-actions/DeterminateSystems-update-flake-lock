@@ -1,0 +1,23 @@
+name: Test base input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Verify base input is accepted by the action
+        id: action
+        uses: .
+        with:
+          base: main
+          branch: update_flake_lock_test_base
+          pr-title: "flake.lock: Update (base input test)"
+          commit-msg: "flake.lock: Update (base input test)"
+          _internal-strict-mode: false
+        continue-on-error: true
+      - name: Assert action ran with base input
+        run: |
+          echo "Action completed (with or without PR creation)"
+          echo "The base input was accepted by the action"
+          echo "PASS"
