@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Validate YAML
+        uses: nwisbeta/validate-yaml-schema@c3734e647d2a3beb98b9132330067e900fdbd1a2 # v2.0.0
+        with:
+          yamlSchemasJson: |
+            {
+              "https://json.schemastore.org/github-action.json": ["action.yml"]
+            }

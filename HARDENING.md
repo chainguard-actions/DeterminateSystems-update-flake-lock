@@ -8,20 +8,35 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
-Action **DeterminateSystems--update-flake-lock/v27** was hardened automatically. 7 finding(s) were identified and resolved across 1 iteration(s).
+Action **DeterminateSystems--update-flake-lock/v27** was hardened automatically. 7 finding(s) were identified and resolved across 3 iteration(s).
 
 ## Findings Fixed
 
+### unpinned-uses (severity: high)
+
+Two `uses:` references in action.yml are pinned to mutable version tags instead of immutable 40-character SHA digests, making the action vulnerable to supply-chain attacks if those tags are moved:
+- `DamianReeves/write-file-action@v1.3` (tag, not a SHA)
+- `juliangruber/read-file-action@v1` (tag, not a SHA)
+
+The other three references (`crazy-max/ghaction-import-gpg`, `pedrolamas/handlebars-action`, `peter-evans/create-pull-request`) are correctly SHA-pinned.
+
+Locations:
+
+- `action.yml:155`
+- `action.yml:168`
+
 ### script-injection (severity: high)
 
-Sub-rule (a): The 'Set environment variables (unsigned commits)' run: block directly interpolates ${{ inputs.* }} expressions inside shell command strings, enabling script injection. Offending lines:
+Sub-rule (a): The 'Set environment variables (unsigned commits)' run: block directly interpolates caller-controlled `${{ inputs.* }}` expressions inside shell command strings. These values flow through YAML template substitution before the shell processes them, allowing an attacker to inject arbitrary shell metacharacters:
+
   echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV
   echo "GIT_AUTHOR_EMAIL=<${{ inputs.git-author-email }}>" >> $GITHUB_ENV
   echo "GIT_COMMITTER_NAME=${{ inputs.git-committer-name }}" >> $GITHUB_ENV
   echo "GIT_COMMITTER_EMAIL=<${{ inputs.git-committer-email }}>" >> $GITHUB_ENV
-An attacker-controlled input value containing shell metacharacters (e.g. newlines, backticks, semicolons) is substituted directly into the shell command before the shell parses it.
+
+These inputs should be passed via an `env:` block and the shell variables double-quoted.
 
 Locations:
 
@@ -29,38 +44,26 @@ Locations:
 
 ### github-env-injection (severity: high)
 
-Two steps write unsanitized untrusted values to $GITHUB_ENV without the required `printf '%s' ... | tr -d '\n\r'` sanitization step:
+Two run: steps write untrusted values to $GITHUB_ENV without the required sanitization (`printf '%s' ... | tr -d '\n\r'`), enabling newline injection that can set arbitrary environment variables for subsequent steps.
 
-(1) 'Set environment variables (signed commits)': writes steps.import-gpg.outputs.name and steps.import-gpg.outputs.email (workflow-controllable step outputs) via env: vars directly to $GITHUB_ENV — sub-rule (c) violation:
+(1) 'Set environment variables (signed commits)': writes step outputs (`steps.import-gpg.outputs.name`, `steps.import-gpg.outputs.email`) via env vars to $GITHUB_ENV without sanitization:
   echo "GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME" >> $GITHUB_ENV
   echo "GIT_AUTHOR_EMAIL=<$GIT_AUTHOR_EMAIL>" >> $GITHUB_ENV
   echo "GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME" >> $GITHUB_ENV
   echo "GIT_COMMITTER_EMAIL=<$GIT_COMMITTER_EMAIL>" >> $GITHUB_ENV
 
-(2) 'Set environment variables (unsigned commits)': directly writes ${{ inputs.* }} expressions to $GITHUB_ENV — sub-rule (a)/(b) violation:
+(2) 'Set environment variables (unsigned commits)': directly interpolates `${{ inputs.* }}` values and writes them to $GITHUB_ENV without sanitization:
   echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV
   echo "GIT_AUTHOR_EMAIL=<${{ inputs.git-author-email }}>" >> $GITHUB_ENV
   echo "GIT_COMMITTER_NAME=${{ inputs.git-committer-name }}" >> $GITHUB_ENV
   echo "GIT_COMMITTER_EMAIL=<${{ inputs.git-committer-email }}>" >> $GITHUB_ENV
 
-A newline injected into any of these values would allow an attacker to write arbitrary variables into the runner's environment.
+A value containing a newline (e.g. `name\nSECRET_KEY=injected`) would inject an additional environment variable into $GITHUB_ENV.
 
 Locations:
 
-- `action.yml:109`
+- `action.yml:110`
 - `action.yml:120`
-
-### unpinned-uses (severity: high)
-
-Two `uses:` references in action.yml are pinned to mutable tags rather than immutable 40-character commit SHAs, making the action vulnerable to supply-chain attacks if the referenced tag is moved or overwritten:
-  - uses: DamianReeves/write-file-action@v1.3  (tag: v1.3)
-  - uses: juliangruber/read-file-action@v1     (tag: v1)
-The other three uses: references (crazy-max/ghaction-import-gpg, pedrolamas/handlebars-action, peter-evans/create-pull-request) are correctly SHA-pinned.
-
-Locations:
-
-- `action.yml:143`
-- `action.yml:155`
 
 ### static-inline-injection (severity: high)
 
@@ -98,12 +101,29 @@ Locations:
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, github-env-injection, unpinned-uses, static-inline-injection
+**Fixes applied:** unpinned-uses, script-injection, github-env-injection, static-inline-injection
 
 **Notes:**
 
-Fixed all four finding types in action.yml:
-1. script-injection/static-inline-injection: Moved all ${{ inputs.* }} expressions in 'Set environment variables (unsigned commits)' from the run: block into an env: map (GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL).
-2. github-env-injection: Both 'Set environment variables (signed commits)' and 'Set environment variables (unsigned commits)' steps now sanitize values with `printf '%s' "$VAR" | tr -d '\n\r'` before writing to $GITHUB_ENV, preventing newline injection.
-3. unpinned-uses: Pinned DamianReeves/write-file-action@v1.3 to SHA 6929a9a6d1807689191dcc8bbe62b54d70a32b42 and juliangruber/read-file-action@v1 to SHA 271ff311a4947af354c6abcd696a306553b9ec18, both with tag comments for readability.
+Fixed all 7 findings in hardened/action/action.yml:
+1. Pinned DamianReeves/write-file-action@v1.3 → @6929a9a6d1807689191dcc8bbe62b54d70a32b42 # v1.3
+2. Pinned juliangruber/read-file-action@v1 → @271ff311a4947af354c6abcd696a306553b9ec18 # v1
+3. Moved all ${{ inputs.git-author-name/email }}, ${{ inputs.git-committer-name/email }} expressions from the 'Set environment variables (unsigned commits)' run: block into an env: block, eliminating shell injection risk.
+4. Added printf '%s' ... | tr -d '\n\r' sanitization in both 'Set environment variables (signed commits)' and 'Set environment variables (unsigned commits)' steps before writing to $GITHUB_ENV, preventing newline injection attacks.
+
+### Iteration 2
+
+**Fixes applied:** github-env-injection
+
+**Notes:**
+
+Fixed the 'Set additional env variables (GIT_COMMIT_MESSAGE)' step in hardened/action/action.yml. Replaced the heredoc-based write (which wrote the raw, multi-line git commit body to $GITHUB_ENV) with a sanitized approach: the commit message is now passed through `printf '%s' "$COMMIT_MESSAGE" | tr -d '\n\r'` to strip all embedded newlines and carriage returns before being written as a simple `GIT_COMMIT_MESSAGE=$safe_msg` key=value pair to $GITHUB_ENV. This prevents an attacker from injecting arbitrary environment variable assignments via crafted commit messages.
+
+### Iteration 3
+
+**Fixes applied:** unpinned-uses, missing-permissions
+
+**Notes:**
+
+Pinned all 9 unpinned action references to full 40-character SHA hashes with original tag/branch as comments: actions/checkout@v4 → 34e114876b0b11c390a56381ad16ebd13914f8d5, DeterminateSystems/flake-checker-action@main → de924abd783455e8429c858962b9e43062d19da1, DeterminateSystems/determinate-nix-action@v3 → 2a0be2498974c2b6327e19780488744384637d88, DeterminateSystems/flakehub-cache-action@main → 3be0931021788e3bb4df65f59a555039c2fa2d46, DeterminateSystems/update-flake-lock@main → ec13d37c32ca75bc750ecc133e944e5a18164688, nwisbeta/validate-yaml-schema@v2.0.0 → c3734e647d2a3beb98b9132330067e900fdbd1a2. Added top-level `permissions: contents: read` to validate.yml to fix the missing-permissions finding.
 

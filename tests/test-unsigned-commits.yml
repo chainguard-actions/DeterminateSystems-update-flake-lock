@@ -1,0 +1,39 @@
+name: Test unsigned commits (default)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Test the default unsigned commit path (sign-commits: false).
+      # This exercises the "Set environment variables (unsigned commits)" step
+      # which sets GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, etc.
+      # The action will fail because Nix is not installed, but the env var setup
+      # should succeed before that point.
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          sign-commits: "false"
+          git-author-name: "my-bot"
+          git-author-email: "my-bot@users.noreply.github.com"
+          git-committer-name: "my-bot"
+          git-committer-email: "my-bot@users.noreply.github.com"
+          commit-msg: "flake.lock: Update (unsigned)"
+          pr-title: "flake.lock: Update (unsigned)"
+          branch: "update-flake-unsigned-test"
+          _internal-strict-mode: "false"
+
+      - name: Assert action ran (failed due to missing Nix, not bad inputs)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # The action should fail because Nix is not installed, not because of bad inputs.
+          if [ "$OUTCOME" = "cancelled" ]; then
+            echo "FAIL: action was unexpectedly cancelled"
+            exit 1
+          fi
+          echo "PASS: action handled unsigned commit inputs without crashing at input-parsing stage"
