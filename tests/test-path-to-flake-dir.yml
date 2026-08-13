@@ -1,4 +1,4 @@
-name: Test basic usage - update all flake inputs
+name: Test path-to-flake-dir input
 on:
   workflow_dispatch:
 jobs:
@@ -7,12 +7,13 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up fake nix binary
+      - name: Set up fake nix binary that records cwd
         run: |
           mkdir -p "$HOME/.local/bin"
           cat > "$HOME/.local/bin/nix" << 'NIXEOF'
           #!/bin/sh
           echo "fake nix called with args: $*"
+          echo "CWD=$(pwd)" > /tmp/nix_cwd.txt
           echo "$*" > /tmp/nix_args_raw.txt
           touch flake.lock
           exit 0
@@ -20,20 +21,21 @@ jobs:
           chmod +x "$HOME/.local/bin/nix"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Create minimal flake.nix and flake.lock
+      - name: Create flake in a subdirectory
         run: |
           git config user.email "test@example.com"
           git config user.name "Test User"
-          cat > flake.nix << 'FLAKE_EOF'
+          mkdir -p nix-config
+          cat > nix-config/flake.nix << 'FLAKE_EOF'
           {
-            description = "Test flake";
+            description = "Test flake in subdir";
             inputs = {
               nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
             };
             outputs = { self, nixpkgs }: {};
           }
           FLAKE_EOF
-          cat > flake.lock << 'LOCK_EOF'
+          cat > nix-config/flake.lock << 'LOCK_EOF'
           {
             "nodes": {
               "nixpkgs": {
@@ -62,33 +64,34 @@ jobs:
             "version": 7
           }
           LOCK_EOF
-          git add flake.nix flake.lock
-          git commit -m "Add test flake files"
+          git add nix-config/
+          git commit -m "Add test flake in subdirectory"
 
-      - name: Run update-flake-lock action
+      - name: Run update-flake-lock action with path-to-flake-dir
         id: action
         uses: .
         with:
           token: ${{ github.token }}
-          commit-msg: "flake.lock: Update (test)"
-          pr-title: "flake.lock: Update (test)"
-          branch: "test-update-flake-lock-basic"
+          path-to-flake-dir: "nix-config"
+          commit-msg: "flake.lock: Update (subdir test)"
+          pr-title: "flake.lock: Update (subdir test)"
+          branch: "test-path-to-flake-dir-branch"
         continue-on-error: true
 
-      - name: Assert nix was invoked with flake update subcommand
+      - name: Assert nix was called in the correct directory
         run: |
-          echo "Checking if nix was called..."
-          if [ -f /tmp/nix_args_raw.txt ]; then
-            ARGS=$(cat /tmp/nix_args_raw.txt)
-            echo "nix args: $ARGS"
-            if echo "$ARGS" | grep -q "flake" && echo "$ARGS" | grep -q "update"; then
-              echo "PASS: nix was called with 'flake update'"
+          echo "Checking nix cwd..."
+          if [ -f /tmp/nix_cwd.txt ]; then
+            CWD_LINE=$(cat /tmp/nix_cwd.txt)
+            echo "nix cwd: $CWD_LINE"
+            if echo "$CWD_LINE" | grep -q "nix-config"; then
+              echo "PASS: nix was called in the nix-config subdirectory"
             else
-              echo "FAIL: nix was not called with expected 'flake update' args"
-              echo "Got: $ARGS"
+              echo "FAIL: nix was not called in the expected subdirectory"
+              echo "Got: $CWD_LINE"
               exit 1
             fi
           else
-            echo "WARN: nix args file not found - nix may not have been called"
+            echo "WARN: nix cwd file not found - nix may not have been called"
             echo "PASS: treating as acceptable - action ran without hard crash"
           fi

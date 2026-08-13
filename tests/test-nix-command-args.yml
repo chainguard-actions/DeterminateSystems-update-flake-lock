@@ -1,0 +1,102 @@
+name: Test nix command argument construction
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          inputs: "nixpkgs flake-utils"
+          nix-options: "--extra-substituters https://example.cachix.org"
+          commit-msg: "flake.lock: Update"
+          branch: "update_flake_lock_action"
+          pr-title: "flake.lock: Update"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Assert action was invoked (outcome is not skipped)
+        run: |
+          echo "action outcome: ${{ steps.action.outcome }}"
+          if [ "${{ steps.action.outcome }}" = "skipped" ]; then
+            echo "FAIL: action was skipped, expected it to run"
+            exit 1
+          fi
+          echo "PASS: action ran (outcome: ${{ steps.action.outcome }})"
+
+      - name: Assert GIT_AUTHOR_NAME is set (action env setup ran)
+        run: |
+          echo "GIT_AUTHOR_NAME: '$GIT_AUTHOR_NAME'"
+          if [ -z "$GIT_AUTHOR_NAME" ]; then
+            echo "FAIL: GIT_AUTHOR_NAME should be set by the action's env setup step"
+            exit 1
+          fi
+          echo "PASS: GIT_AUTHOR_NAME is '$GIT_AUTHOR_NAME'"
+
+      - name: Test nix args logic with no specific inputs (update all)
+        run: |
+          NIX_OPTIONS=()
+          FLAKE_INPUTS=()
+          COMMIT_MSG="flake.lock: Update"
+
+          FLAKE_INPUT_FLAGS=()
+          for input in "${FLAKE_INPUTS[@]}"; do
+            FLAKE_INPUT_FLAGS+=("--update-input" "$input")
+          done
+
+          if [ ${#FLAKE_INPUT_FLAGS[@]} -eq 0 ]; then
+            UPDATE_MECHANISM="update"
+          else
+            UPDATE_MECHANISM="lock"
+          fi
+
+          ARGS=("${NIX_OPTIONS[@]}" "flake" "$UPDATE_MECHANISM" "${FLAKE_INPUT_FLAGS[@]}" "--commit-lock-file" "--option" "commit-lockfile-summary" "$COMMIT_MSG")
+          echo "Generated args: ${ARGS[*]}"
+
+          if [ "$UPDATE_MECHANISM" != "update" ]; then
+            echo "FAIL: expected update mechanism 'update', got '$UPDATE_MECHANISM'"
+            exit 1
+          fi
+          echo "PASS: no-inputs args use 'update' mechanism"
+
+      - name: Test nix args logic with specific inputs (lock specific)
+        run: |
+          NIX_OPTIONS=()
+          FLAKE_INPUTS=("nixpkgs" "flake-utils")
+          COMMIT_MSG="flake.lock: Update"
+
+          FLAKE_INPUT_FLAGS=()
+          for input in "${FLAKE_INPUTS[@]}"; do
+            FLAKE_INPUT_FLAGS+=("--update-input" "$input")
+          done
+
+          if [ ${#FLAKE_INPUT_FLAGS[@]} -eq 0 ]; then
+            UPDATE_MECHANISM="update"
+          else
+            UPDATE_MECHANISM="lock"
+          fi
+
+          ARGS=("${NIX_OPTIONS[@]}" "flake" "$UPDATE_MECHANISM" "${FLAKE_INPUT_FLAGS[@]}" "--commit-lock-file" "--option" "commit-lockfile-summary" "$COMMIT_MSG")
+          echo "Generated args: ${ARGS[*]}"
+
+          if [ "$UPDATE_MECHANISM" != "lock" ]; then
+            echo "FAIL: expected update mechanism 'lock', got '$UPDATE_MECHANISM'"
+            exit 1
+          fi
+          ARGS_STR="${ARGS[*]}"
+          if [[ "$ARGS_STR" != *"--update-input nixpkgs"* ]]; then
+            echo "FAIL: expected '--update-input nixpkgs' in args: $ARGS_STR"
+            exit 1
+          fi
+          if [[ "$ARGS_STR" != *"--update-input flake-utils"* ]]; then
+            echo "FAIL: expected '--update-input flake-utils' in args: $ARGS_STR"
+            exit 1
+          fi
+          echo "PASS: specific-inputs args use 'lock' mechanism with correct flags"

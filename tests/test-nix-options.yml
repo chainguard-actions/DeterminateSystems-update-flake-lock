@@ -1,4 +1,4 @@
-name: Test basic usage - update all flake inputs
+name: Test nix-options input
 on:
   workflow_dispatch:
 jobs:
@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up fake nix binary
+      - name: Set up fake nix binary that records args
         run: |
           mkdir -p "$HOME/.local/bin"
           cat > "$HOME/.local/bin/nix" << 'NIXEOF'
@@ -65,26 +65,27 @@ jobs:
           git add flake.nix flake.lock
           git commit -m "Add test flake files"
 
-      - name: Run update-flake-lock action
+      - name: Run update-flake-lock action with nix-options
         id: action
         uses: .
         with:
           token: ${{ github.token }}
-          commit-msg: "flake.lock: Update (test)"
-          pr-title: "flake.lock: Update (test)"
-          branch: "test-update-flake-lock-basic"
+          nix-options: "--extra-substituters https://cache.nixos.org"
+          commit-msg: "flake.lock: Update with extra substituters"
+          pr-title: "flake.lock: Update with extra substituters"
+          branch: "test-nix-options-branch"
         continue-on-error: true
 
-      - name: Assert nix was invoked with flake update subcommand
+      - name: Assert nix was called with extra options prepended
         run: |
-          echo "Checking if nix was called..."
+          echo "Checking nix args..."
           if [ -f /tmp/nix_args_raw.txt ]; then
             ARGS=$(cat /tmp/nix_args_raw.txt)
             echo "nix args: $ARGS"
-            if echo "$ARGS" | grep -q "flake" && echo "$ARGS" | grep -q "update"; then
-              echo "PASS: nix was called with 'flake update'"
+            if echo "$ARGS" | grep -q -- "--extra-substituters"; then
+              echo "PASS: nix was called with --extra-substituters option"
             else
-              echo "FAIL: nix was not called with expected 'flake update' args"
+              echo "FAIL: nix was not called with expected --extra-substituters option"
               echo "Got: $ARGS"
               exit 1
             fi

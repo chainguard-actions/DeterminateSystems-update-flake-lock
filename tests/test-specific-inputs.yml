@@ -1,4 +1,4 @@
-name: Test basic usage - update all flake inputs
+name: Test updating specific flake inputs
 on:
   workflow_dispatch:
 jobs:
@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up fake nix binary
+      - name: Set up fake nix binary that records args
         run: |
           mkdir -p "$HOME/.local/bin"
           cat > "$HOME/.local/bin/nix" << 'NIXEOF'
@@ -20,7 +20,7 @@ jobs:
           chmod +x "$HOME/.local/bin/nix"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Create minimal flake.nix and flake.lock
+      - name: Create minimal flake.nix and flake.lock with multiple inputs
         run: |
           git config user.email "test@example.com"
           git config user.name "Test User"
@@ -29,13 +29,33 @@ jobs:
             description = "Test flake";
             inputs = {
               nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+              home-manager = {
+                url = "github:nix-community/home-manager";
+                inputs.nixpkgs.follows = "nixpkgs";
+              };
             };
-            outputs = { self, nixpkgs }: {};
+            outputs = { self, nixpkgs, home-manager }: {};
           }
           FLAKE_EOF
           cat > flake.lock << 'LOCK_EOF'
           {
             "nodes": {
+              "home-manager": {
+                "inputs": { "nixpkgs": "nixpkgs" },
+                "locked": {
+                  "lastModified": 1700000000,
+                  "narHash": "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+                  "owner": "nix-community",
+                  "repo": "home-manager",
+                  "rev": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "type": "github"
+                },
+                "original": {
+                  "owner": "nix-community",
+                  "repo": "home-manager",
+                  "type": "github"
+                }
+              },
               "nixpkgs": {
                 "locked": {
                   "lastModified": 1700000000,
@@ -54,7 +74,8 @@ jobs:
               },
               "root": {
                 "inputs": {
-                  "nixpkgs": "nixpkgs"
+                  "nixpkgs": "nixpkgs",
+                  "home-manager": "home-manager"
                 }
               }
             },
@@ -65,26 +86,28 @@ jobs:
           git add flake.nix flake.lock
           git commit -m "Add test flake files"
 
-      - name: Run update-flake-lock action
+      - name: Run update-flake-lock action with specific inputs
         id: action
         uses: .
         with:
           token: ${{ github.token }}
-          commit-msg: "flake.lock: Update (test)"
-          pr-title: "flake.lock: Update (test)"
-          branch: "test-update-flake-lock-basic"
+          inputs: "nixpkgs"
+          commit-msg: "flake.lock: Update nixpkgs"
+          pr-title: "flake.lock: Update nixpkgs"
+          branch: "test-specific-inputs-branch"
         continue-on-error: true
 
-      - name: Assert nix was invoked with flake update subcommand
+      - name: Assert nix was called with lock subcommand and --update-input
         run: |
-          echo "Checking if nix was called..."
+          echo "Checking nix args..."
           if [ -f /tmp/nix_args_raw.txt ]; then
             ARGS=$(cat /tmp/nix_args_raw.txt)
             echo "nix args: $ARGS"
-            if echo "$ARGS" | grep -q "flake" && echo "$ARGS" | grep -q "update"; then
-              echo "PASS: nix was called with 'flake update'"
+            if echo "$ARGS" | grep -q "lock" && echo "$ARGS" | grep -q -- "--update-input" && echo "$ARGS" | grep -q "nixpkgs"; then
+              echo "PASS: nix was called with 'lock --update-input nixpkgs'"
             else
-              echo "FAIL: nix was not called with expected 'flake update' args"
+              echo "FAIL: nix was not called with expected args for specific input update"
+              echo "Expected args to contain: 'lock', '--update-input', 'nixpkgs'"
               echo "Got: $ARGS"
               exit 1
             fi

@@ -1,0 +1,57 @@
+name: Test default git author/committer env vars
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          commit-msg: "flake.lock: Update"
+          branch: "update_flake_lock_action"
+          pr-title: "flake.lock: Update"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Assert GIT_AUTHOR_NAME
+        run: |
+          echo "actual: $GIT_AUTHOR_NAME"
+          if [ "$GIT_AUTHOR_NAME" != "github-actions[bot]" ]; then
+            echo "FAIL: expected 'github-actions[bot]', got '$GIT_AUTHOR_NAME'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert GIT_AUTHOR_EMAIL
+        run: |
+          echo "actual: $GIT_AUTHOR_EMAIL"
+          if [ "$GIT_AUTHOR_EMAIL" != "<github-actions[bot]@users.noreply.github.com>" ]; then
+            echo "FAIL: expected '<github-actions[bot]@users.noreply.github.com>', got '$GIT_AUTHOR_EMAIL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert GIT_COMMITTER_NAME
+        run: |
+          echo "actual: $GIT_COMMITTER_NAME"
+          if [ "$GIT_COMMITTER_NAME" != "github-actions[bot]" ]; then
+            echo "FAIL: expected 'github-actions[bot]', got '$GIT_COMMITTER_NAME'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert GIT_COMMITTER_EMAIL
+        run: |
+          echo "actual: $GIT_COMMITTER_EMAIL"
+          if [ "$GIT_COMMITTER_EMAIL" != "<github-actions[bot]@users.noreply.github.com>" ]; then
+            echo "FAIL: expected '<github-actions[bot]@users.noreply.github.com>', got '$GIT_COMMITTER_EMAIL'"
+            exit 1
+          fi
+          echo "PASS"

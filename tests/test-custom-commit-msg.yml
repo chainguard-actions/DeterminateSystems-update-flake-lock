@@ -1,4 +1,4 @@
-name: Test basic usage - update all flake inputs
+name: Test custom commit message and branch
 on:
   workflow_dispatch:
 jobs:
@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up fake nix binary
+      - name: Set up fake nix binary that records args
         run: |
           mkdir -p "$HOME/.local/bin"
           cat > "$HOME/.local/bin/nix" << 'NIXEOF'
@@ -65,26 +65,30 @@ jobs:
           git add flake.nix flake.lock
           git commit -m "Add test flake files"
 
-      - name: Run update-flake-lock action
+      - name: Run update-flake-lock action with custom commit message
         id: action
         uses: .
         with:
           token: ${{ github.token }}
-          commit-msg: "flake.lock: Update (test)"
-          pr-title: "flake.lock: Update (test)"
-          branch: "test-update-flake-lock-basic"
+          commit-msg: "chore: update flake inputs"
+          pr-title: "chore: update flake inputs"
+          branch: "test-custom-commit-msg-branch"
+          git-author-name: "Test Bot"
+          git-author-email: "testbot@example.com"
+          git-committer-name: "Test Bot"
+          git-committer-email: "testbot@example.com"
         continue-on-error: true
 
-      - name: Assert nix was invoked with flake update subcommand
+      - name: Assert nix was called with correct commit-lockfile-summary
         run: |
-          echo "Checking if nix was called..."
+          echo "Checking nix args..."
           if [ -f /tmp/nix_args_raw.txt ]; then
             ARGS=$(cat /tmp/nix_args_raw.txt)
             echo "nix args: $ARGS"
-            if echo "$ARGS" | grep -q "flake" && echo "$ARGS" | grep -q "update"; then
-              echo "PASS: nix was called with 'flake update'"
+            if echo "$ARGS" | grep -q "commit-lockfile-summary"; then
+              echo "PASS: nix was called with commit-lockfile-summary option"
             else
-              echo "FAIL: nix was not called with expected 'flake update' args"
+              echo "FAIL: nix was not called with commit-lockfile-summary option"
               echo "Got: $ARGS"
               exit 1
             fi
