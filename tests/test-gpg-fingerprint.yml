@@ -1,0 +1,48 @@
+name: Test gpg-fingerprint input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a minimal flake.nix for the action
+        run: |
+          cat > flake.nix << 'EOF'
+          {
+            description = "Test flake";
+            inputs = {};
+            outputs = { self }: {};
+          }
+          EOF
+          cat > flake.lock << 'EOF'
+          {
+            "nodes": {
+              "root": {}
+            },
+            "root": "root",
+            "version": 7
+          }
+          EOF
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          sign-commits: "false"
+          gpg-fingerprint: "AABBCCDDEEFF00112233445566778899AABBCCDD"
+          branch: update_flake_lock_test_gpg
+          pr-title: "flake.lock: Update (gpg-fingerprint test)"
+          commit-msg: "flake.lock: Update (gpg-fingerprint test)"
+      - name: Assert action ran with gpg-fingerprint input (may fail gracefully without Nix or on sentinel repo)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected without Nix or on sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

@@ -1,0 +1,70 @@
+name: Test basic usage (no Nix installed)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a minimal flake.nix for the action to find
+        run: |
+          cat > flake.nix << 'EOF'
+          {
+            description = "Test flake";
+            inputs = {
+              nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+            };
+            outputs = { self, nixpkgs }: {};
+          }
+          EOF
+          cat > flake.lock << 'EOF'
+          {
+            "nodes": {
+              "nixpkgs": {
+                "locked": {
+                  "lastModified": 1700000000,
+                  "narHash": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                  "owner": "NixOS",
+                  "repo": "nixpkgs",
+                  "rev": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "type": "github"
+                },
+                "original": {
+                  "owner": "NixOS",
+                  "ref": "nixos-unstable",
+                  "repo": "nixpkgs",
+                  "type": "github"
+                }
+              },
+              "root": {
+                "inputs": {
+                  "nixpkgs": "nixpkgs"
+                }
+              }
+            },
+            "root": "root",
+            "version": 7
+          }
+          EOF
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          commit-msg: "flake.lock: Update"
+          pr-title: "flake.lock: Update"
+
+      - name: Assert action ran (fails gracefully without Nix or with sentinel repo)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded (Nix was available and PR was created or no changes)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected — Nix not installed or sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

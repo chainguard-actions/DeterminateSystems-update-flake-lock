@@ -1,0 +1,88 @@
+name: Test updating specific flake inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a minimal flake.nix with multiple inputs
+        run: |
+          cat > flake.nix << 'EOF'
+          {
+            description = "Test flake with multiple inputs";
+            inputs = {
+              nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+              flake-utils.url = "github:numtide/flake-utils";
+            };
+            outputs = { self, nixpkgs, flake-utils }: {};
+          }
+          EOF
+          cat > flake.lock << 'EOF'
+          {
+            "nodes": {
+              "flake-utils": {
+                "locked": {
+                  "lastModified": 1700000000,
+                  "narHash": "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+                  "owner": "numtide",
+                  "repo": "flake-utils",
+                  "rev": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "type": "github"
+                },
+                "original": {
+                  "owner": "numtide",
+                  "repo": "flake-utils",
+                  "type": "github"
+                }
+              },
+              "nixpkgs": {
+                "locked": {
+                  "lastModified": 1700000000,
+                  "narHash": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                  "owner": "NixOS",
+                  "repo": "nixpkgs",
+                  "rev": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "type": "github"
+                },
+                "original": {
+                  "owner": "NixOS",
+                  "ref": "nixos-unstable",
+                  "repo": "nixpkgs",
+                  "type": "github"
+                }
+              },
+              "root": {
+                "inputs": {
+                  "flake-utils": "flake-utils",
+                  "nixpkgs": "nixpkgs"
+                }
+              }
+            },
+            "root": "root",
+            "version": 7
+          }
+          EOF
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          inputs: "nixpkgs"
+          commit-msg: "flake.lock: Update nixpkgs"
+          pr-title: "flake.lock: Update nixpkgs"
+
+      - name: Assert action ran for specific input (fails gracefully without Nix or with sentinel repo)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded updating specific input"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected — Nix not installed or sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

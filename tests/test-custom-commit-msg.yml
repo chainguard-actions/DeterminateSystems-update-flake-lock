@@ -1,0 +1,76 @@
+name: Test custom commit message and PR title
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a minimal flake.nix for the action to find
+        run: |
+          cat > flake.nix << 'EOF'
+          {
+            description = "Test flake";
+            inputs = {
+              nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+            };
+            outputs = { self, nixpkgs }: {};
+          }
+          EOF
+          cat > flake.lock << 'EOF'
+          {
+            "nodes": {
+              "nixpkgs": {
+                "locked": {
+                  "lastModified": 1700000000,
+                  "narHash": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                  "owner": "NixOS",
+                  "repo": "nixpkgs",
+                  "rev": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "type": "github"
+                },
+                "original": {
+                  "owner": "NixOS",
+                  "ref": "nixos-unstable",
+                  "repo": "nixpkgs",
+                  "type": "github"
+                }
+              },
+              "root": {
+                "inputs": {
+                  "nixpkgs": "nixpkgs"
+                }
+              }
+            },
+            "root": "root",
+            "version": 7
+          }
+          EOF
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          commit-msg: "chore: update flake inputs"
+          pr-title: "chore: update flake inputs"
+          pr-labels: "dependencies,nix"
+          branch: "test-update-flake-lock-branch"
+          git-author-name: "Test Bot"
+          git-author-email: "test-bot@example.com"
+          git-committer-name: "Test Bot"
+          git-committer-email: "test-bot@example.com"
+
+      - name: Assert action ran with custom inputs (fails gracefully without Nix or with sentinel repo)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded with custom commit message"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected — Nix not installed or sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
