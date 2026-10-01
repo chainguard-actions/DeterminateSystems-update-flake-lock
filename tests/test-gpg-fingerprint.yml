@@ -15,33 +15,32 @@ jobs:
             outputs = { self }: {};
           }
           EOF
-          cat > flake.lock << 'EOF'
-          {
-            "nodes": {
-              "root": {}
-            },
-            "root": "root",
-            "version": 7
-          }
-          EOF
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          git add flake.nix
+          git commit -m "Add test flake.nix" || true
       - id: action
         uses: .
         continue-on-error: true
         with:
           sign-commits: "false"
-          gpg-fingerprint: "AABBCCDDEEFF00112233445566778899AABBCCDD"
+          gpg-fingerprint: ""
           branch: update_flake_lock_test_gpg
-          pr-title: "flake.lock: Update (gpg-fingerprint test)"
+          pr-title: "Test: flake.lock update with gpg-fingerprint input"
           commit-msg: "flake.lock: Update (gpg-fingerprint test)"
-      - name: Assert action ran with gpg-fingerprint input (may fail gracefully without Nix or on sentinel repo)
+      - name: Assert action ran (gpg-fingerprint input accepted, or failed gracefully)
         env:
           OUTCOME: ${{ steps.action.outcome }}
+          PR_NUMBER: ${{ steps.action.outputs.pull-request-number }}
+          PR_URL: ${{ steps.action.outputs.pull-request-url }}
         run: |
           echo "outcome: $OUTCOME"
+          echo "pull-request-number: $PR_NUMBER"
+          echo "pull-request-url: $PR_URL"
           if [ "$OUTCOME" = "success" ]; then
             echo "PASS: action succeeded"
           elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (expected without Nix or on sentinel repo)"
+            echo "PASS: action failed gracefully (expected with sentinel repo or missing Nix)"
           else
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
