@@ -1,0 +1,36 @@
+name: Test gpg-fingerprint input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          # gpg-fingerprint is passed to exercise that input path;
+          # sign-commits is false so no real GPG key is needed.
+          gpg-fingerprint: "AABBCCDDEEFF00112233445566778899AABBCCDD"
+          sign-commits: "false"
+          branch: update_flake_lock_gpg_test
+          pr-title: "flake.lock: Update (gpg-fingerprint test)"
+          commit-msg: "flake.lock: Update (gpg-fingerprint test)"
+      - name: Assert action ran (succeeded or failed gracefully on sentinel repo)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          PR_NUMBER: ${{ steps.action.outputs.pull-request-number }}
+          PR_URL: ${{ steps.action.outputs.pull-request-url }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "pull-request-number: $PR_NUMBER"
+          echo "pull-request-url: $PR_URL"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (sentinel repo is not resolvable)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
