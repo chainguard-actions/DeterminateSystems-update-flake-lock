@@ -6,40 +6,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Create a minimal flake.nix for the action
-        run: |
-          cat > flake.nix << 'EOF'
-          {
-            description = "Test flake";
-            inputs = {};
-            outputs = { self }: {};
-          }
-          EOF
-          git config user.email "test@example.com"
-          git config user.name "Test User"
-          git add flake.nix
-          git commit -m "Add test flake.nix" || true
       - id: action
         uses: .
         continue-on-error: true
         with:
           base: main
-          branch: update_flake_lock_test_base
-          pr-title: "Test: flake.lock update with base branch"
+          branch: update_flake_lock_action_base_test
+          pr-title: "flake.lock: Update (base branch test)"
           commit-msg: "flake.lock: Update (base branch test)"
-      - name: Assert action ran (base input accepted, or failed gracefully on sentinel repo)
+      - name: Assert action ran (base input accepted, or failed gracefully)
         env:
           OUTCOME: ${{ steps.action.outcome }}
-          PR_NUMBER: ${{ steps.action.outputs.pull-request-number }}
-          PR_URL: ${{ steps.action.outputs.pull-request-url }}
         run: |
           echo "outcome: $OUTCOME"
-          echo "pull-request-number: $PR_NUMBER"
-          echo "pull-request-url: $PR_URL"
           if [ "$OUTCOME" = "success" ]; then
-            echo "PASS: action succeeded"
+            echo "PASS: action succeeded with base input"
           elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (expected with sentinel repo or missing Nix)"
+            echo "PASS: action failed gracefully (expected — Nix not installed or sentinel repo)"
           else
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
