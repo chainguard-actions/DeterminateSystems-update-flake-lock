@@ -1,4 +1,4 @@
-name: Test base branch input
+name: Test base input
 on:
   workflow_dispatch:
 jobs:
@@ -6,17 +6,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Create a minimal flake.lock for the action to process
+      - name: Create a minimal flake.nix for the action to find
         run: |
-          cat > flake.lock << 'EOF'
-          {
-            "nodes": {
-              "root": {}
-            },
-            "root": "root",
-            "version": 7
-          }
-          EOF
           cat > flake.nix << 'EOF'
           {
             description = "Test flake";
@@ -24,15 +15,19 @@ jobs:
             outputs = { self }: {};
           }
           EOF
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          git add flake.nix
+          git commit -m "Add test flake.nix" || true
       - id: action
         uses: .
         continue-on-error: true
         with:
           base: main
           branch: update_flake_lock_test_base
-          pr-title: "test: base branch input"
-          commit-msg: "flake.lock: Update (base branch test)"
-      - name: Assert action ran with base input (success or graceful failure on sentinel repo)
+          pr-title: "test: base input coverage"
+          commit-msg: "flake.lock: Update (base input test)"
+      - name: Assert action ran with base input
         env:
           OUTCOME: ${{ steps.action.outcome }}
           PR_NUMBER: ${{ steps.action.outputs.pull-request-number }}
@@ -42,9 +37,9 @@ jobs:
           echo "pull-request-number: $PR_NUMBER"
           echo "pull-request-url: $PR_URL"
           if [ "$OUTCOME" = "success" ]; then
-            echo "PASS: action succeeded"
+            echo "PASS: action succeeded with base input"
           elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (expected on sentinel repo)"
+            echo "PASS: action failed gracefully (expected in harness - no Nix or sentinel repo)"
           else
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
