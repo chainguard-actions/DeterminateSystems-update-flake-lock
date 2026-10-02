@@ -126,7 +126,7 @@ runs:
     - name: Import bot's GPG key for signing commits
       if: ${{ inputs.sign-commits == 'true' }}
       id: import-gpg
-      uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+      uses: chainguard-actions/crazy-max-ghaction-import-gpg@086609fbaedaedc86bcdf8d74d7981bc6165f652 # v6.3.0
       with:
         gpg_private_key: ${{ inputs.gpg-private-key }}
         fingerprint: ${{ inputs.gpg-fingerprint }}
@@ -231,7 +231,7 @@ runs:
       run: rm -f pr_body.txt pr_body.template
     - name: Create PR
       id: create-pr
-      uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.0.5
+      uses: chainguard-actions/peter-evans-create-pull-request@68c8668d333bc8f36bcb8048b56b4b8303c3b404 # v6.0.5
       with:
         base: ${{ inputs.base }}
         branch: ${{ inputs.branch }}
