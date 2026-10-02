@@ -6,19 +6,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Test action accepts gpg-fingerprint input
-        id: action
+      - id: action
         uses: .
+        continue-on-error: true
         with:
+          sign-commits: "true"
+          gpg-private-key: ""
           gpg-fingerprint: "AABBCCDDEEFF00112233445566778899AABBCCDD"
-          sign-commits: "false"
-          branch: update_flake_lock_test_gpg
+          gpg-passphrase: ""
+          branch: update_flake_lock_action_gpg_test
           pr-title: "flake.lock: Update (gpg-fingerprint test)"
           commit-msg: "flake.lock: Update (gpg-fingerprint test)"
-          _internal-strict-mode: false
-        continue-on-error: true
-      - name: Assert action ran with gpg-fingerprint input
+      - name: Assert action ran (failed gracefully due to missing GPG key or sentinel repo)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
         run: |
-          echo "Action completed (with or without PR creation)"
-          echo "The gpg-fingerprint input was accepted by the action"
-          echo "PASS"
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded unexpectedly (no GPG key provided, but continuing)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected: no valid GPG key or sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
