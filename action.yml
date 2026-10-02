@@ -214,7 +214,7 @@ runs:
         echo "$DELIMITER" >> $GITHUB_ENV
         echo "GIT_COMMIT_MESSAGE is: ${COMMIT_MESSAGE}"
     - name: Interpolate PR Body
-      uses: pedrolamas/handlebars-action@2995d7eadacbc8f2f6ab8431a01d84a5fa3b8bb4 # v2.4.0
+      uses: chainguard-actions/pedrolamas-handlebars-action@f51bde61bf2c9bd28a86fa8db47d06b8da2e1776 # v2.4.0
       with:
         files: "pr_body.template"
         output-filename: "pr_body.txt"
