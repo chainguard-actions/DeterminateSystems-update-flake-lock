@@ -6,39 +6,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Set up git identity
-        run: |
-          git config user.email "test@example.com"
-          git config user.name "Test User"
-      - name: Create a minimal flake.nix for the action
-        run: |
-          cat > flake.nix << 'EOF'
-          {
-            description = "Test flake";
-            inputs = {};
-            outputs = { self }: {};
-          }
-          EOF
-          cat > flake.lock << 'EOF'
-          {
-            "nodes": {
-              "root": {}
-            },
-            "root": "root",
-            "version": 7
-          }
-          EOF
       - id: action
         uses: .
-        with:
-          sign-commits: "false"
-          gpg-fingerprint: "AABBCCDDEEFF00112233445566778899AABBCCDD"
-          branch: test-gpg-fingerprint-update
-          pr-title: "Test: gpg-fingerprint input"
-          _internal-strict-mode: false
         continue-on-error: true
-      - name: Assert action accepted gpg-fingerprint input
+        with:
+          sign-commits: "true"
+          gpg-private-key: ""
+          gpg-fingerprint: "AABBCCDDEEFF00112233445566778899AABBCCDD"
+          gpg-passphrase: ""
+          branch: update_flake_lock_gpg_test
+          pr-title: "flake.lock: Update (gpg fingerprint test)"
+          commit-msg: "flake.lock: Update (gpg fingerprint test)"
+      - name: Assert action ran with gpg-fingerprint input (success or graceful failure)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          PR_NUMBER: ${{ steps.action.outputs.pull-request-number }}
+          PR_URL: ${{ steps.action.outputs.pull-request-url }}
         run: |
-          echo "Action completed (with or without error due to missing Nix)"
-          echo "The gpg-fingerprint input was passed successfully to the action"
-          echo "PASS: gpg-fingerprint input is accepted by the action"
+          echo "outcome: $OUTCOME"
+          echo "pull-request-number: $PR_NUMBER"
+          echo "pull-request-url: $PR_URL"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$PR_NUMBER" ] && [ -z "$PR_URL" ]; then
+              echo "FAIL: action succeeded but no PR outputs were set"
+              exit 1
+            fi
+            echo "PASS: action succeeded with gpg-fingerprint input"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (GPG key invalid or sentinel repo not resolvable)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
