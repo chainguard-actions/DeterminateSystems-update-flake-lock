@@ -14,7 +14,7 @@ jobs:
           branch: update_flake_lock_action_base_test
           pr-title: "flake.lock: Update (base branch test)"
           commit-msg: "flake.lock: Update (base branch test)"
-      - name: Assert action ran (outputs set, or failed gracefully on the sentinel repo)
+      - name: Assert action ran with base input (success or graceful failure on sentinel repo)
         env:
           OUTCOME: ${{ steps.action.outcome }}
           PR_NUMBER: ${{ steps.action.outputs.pull-request-number }}

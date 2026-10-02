@@ -209,12 +209,13 @@ runs:
       run: |
         DELIMITER=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
         COMMIT_MESSAGE="$(git log --format=%b -n 1)"
-        echo "GIT_COMMIT_MESSAGE<<$DELIMITER" >> $GITHUB_ENV
-        echo "$COMMIT_MESSAGE" >> $GITHUB_ENV
-        echo "$DELIMITER" >> $GITHUB_ENV
+        SAFE_COMMIT_MESSAGE=$(printf '%s' "$COMMIT_MESSAGE" | tr -d '\r' | grep -v "^${DELIMITER}$" || true)
+        echo "GIT_COMMIT_MESSAGE<<$DELIMITER" >> "$GITHUB_ENV"
+        echo "$SAFE_COMMIT_MESSAGE" >> "$GITHUB_ENV"
+        echo "$DELIMITER" >> "$GITHUB_ENV"
         echo "GIT_COMMIT_MESSAGE is: ${COMMIT_MESSAGE}"
     - name: Interpolate PR Body
-      uses: pedrolamas/handlebars-action@2995d7eadacbc8f2f6ab8431a01d84a5fa3b8bb4 # v2.4.0
+      uses: chainguard-actions/pedrolamas-handlebars-action@f51bde61bf2c9bd28a86fa8db47d06b8da2e1776 # v2.4.0
       with:
         files: "pr_body.template"
         output-filename: "pr_body.txt"
