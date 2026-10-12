@@ -6,23 +6,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a minimal flake.nix for the action
+        run: |
+          cat > flake.nix << 'EOF'
+          {
+            description = "Test flake";
+            inputs = {};
+            outputs = { self }: {};
+          }
+          EOF
+          cat > flake.lock << 'EOF'
+          {
+            "nodes": {
+              "root": {}
+            },
+            "root": "root",
+            "version": 7
+          }
+          EOF
       - id: action
         uses: .
         continue-on-error: true
         with:
-          base: main
-          branch: update_flake_lock_action_base_test
-          pr-title: "flake.lock: Update (base branch test)"
+          base: "main"
+          branch: "update_flake_lock_base_test"
+          pr-title: "Test: flake.lock update with base branch"
           commit-msg: "flake.lock: Update (base branch test)"
-      - name: Assert action ran (base input accepted, or failed gracefully)
+      - name: Assert action ran with base input (success or graceful failure on sentinel repo)
         env:
           OUTCOME: ${{ steps.action.outcome }}
+          PR_NUMBER: ${{ steps.action.outputs.pull-request-number }}
+          PR_URL: ${{ steps.action.outputs.pull-request-url }}
+          PR_OP: ${{ steps.action.outputs.pull-request-operation }}
         run: |
           echo "outcome: $OUTCOME"
+          echo "pull-request-number: $PR_NUMBER"
+          echo "pull-request-url: $PR_URL"
+          echo "pull-request-operation: $PR_OP"
           if [ "$OUTCOME" = "success" ]; then
-            echo "PASS: action succeeded with base input"
+            echo "PASS: action succeeded"
           elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (expected — Nix not installed or sentinel repo)"
+            echo "PASS: action failed gracefully (sentinel repo is not resolvable)"
           else
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
