@@ -16,33 +16,43 @@ Action **DeterminateSystems--update-flake-lock/v28** was hardened automatically.
 
 ### script-injection (severity: high)
 
-Sub-rule (a): The 'Set environment variables (unsigned commits)' run: block directly interpolates GitHub Actions expressions inside shell commands. The values `${{ inputs.git-author-name }}`, `${{ inputs.git-author-email }}`, `${{ inputs.git-committer-name }}`, and `${{ inputs.git-committer-email }}` are embedded directly in shell strings written to $GITHUB_ENV. An attacker-controlled input value containing shell metacharacters or newlines can break out of the echo command context. These inputs should be placed in env: variables and the shell expansions double-quoted.
+Rule (a) violation: The 'Set environment variables (unsigned commits)' run: block directly interpolates ${{ inputs.* }} expressions inside shell command strings. Specifically, `${{ inputs.git-author-name }}`, `${{ inputs.git-author-email }}`, `${{ inputs.git-committer-name }}`, and `${{ inputs.git-committer-email }}` are expanded by the Actions template engine before the shell ever sees them, allowing an attacker-controlled value to inject arbitrary shell commands. Offending lines:
+  echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV
+  echo "GIT_AUTHOR_EMAIL=<${{ inputs.git-author-email }}>" >> $GITHUB_ENV
+  echo "GIT_COMMITTER_NAME=${{ inputs.git-committer-name }}" >> $GITHUB_ENV
+  echo "GIT_COMMITTER_EMAIL=<${{ inputs.git-committer-email }}>" >> $GITHUB_ENV
 
 Locations:
 
-- `action.yml:132`
-- `action.yml:133`
-- `action.yml:134`
-- `action.yml:135`
+- `action.yml:145`
+- `action.yml:146`
+- `action.yml:147`
+- `action.yml:148`
 
 ### github-env-injection (severity: high)
 
-Two run: steps write untrusted values to $GITHUB_ENV without the required sanitization step (`printf '%s' ... | tr -d '\n\r'`).
+Two run: blocks write untrusted values to $GITHUB_ENV without the required sanitization step (printf '%s' ... | tr -d '\n\r').
 
-(1) 'Set environment variables (signed commits)' (lines ~124-127): env vars GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL are sourced from `steps.import-gpg.outputs.*` (workflow-controlled) and written directly via `echo "VAR=$VAR" >> $GITHUB_ENV` without newline sanitization. A value containing a newline could inject arbitrary environment variables.
+(1) 'Set environment variables (signed commits)' step (lines ~137-140): Writes $GIT_AUTHOR_NAME, $GIT_AUTHOR_EMAIL, $GIT_COMMITTER_NAME, $GIT_COMMITTER_EMAIL to $GITHUB_ENV. These variables are sourced from steps.import-gpg.outputs.* (untrusted step outputs set via the env: block) and are forwarded without sanitization, e.g.:
+  echo "GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME" >> $GITHUB_ENV
+  echo "GIT_AUTHOR_EMAIL=<$GIT_AUTHOR_EMAIL>" >> $GITHUB_ENV
 
-(2) 'Set environment variables (unsigned commits)' (lines ~132-135): `${{ inputs.git-author-name }}`, `${{ inputs.git-author-email }}`, `${{ inputs.git-committer-name }}`, `${{ inputs.git-committer-email }}` are interpolated directly into echo commands that write to $GITHUB_ENV, with no sanitization applied before the write.
+(2) 'Set environment variables (unsigned commits)' step (lines ~145-148): Directly writes ${{ inputs.* }} values to $GITHUB_ENV without sanitization, e.g.:
+  echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV
+  echo "GIT_AUTHOR_EMAIL=<${{ inputs.git-author-email }}>" >> $GITHUB_ENV
+
+A newline injected into any of these values would allow an attacker to define arbitrary environment variables or override existing ones in subsequent steps.
 
 Locations:
 
-- `action.yml:124`
-- `action.yml:125`
-- `action.yml:126`
-- `action.yml:127`
-- `action.yml:132`
-- `action.yml:133`
-- `action.yml:134`
-- `action.yml:135`
+- `action.yml:137`
+- `action.yml:138`
+- `action.yml:139`
+- `action.yml:140`
+- `action.yml:145`
+- `action.yml:146`
+- `action.yml:147`
+- `action.yml:148`
 
 ### static-inline-injection (severity: high)
 
@@ -84,9 +94,9 @@ Locations:
 
 **Notes:**
 
-Fixed both 'Set environment variables' steps in action.yml:
+Fixed two steps in action.yml:
 
-1. 'Set environment variables (signed commits)': Added newline sanitization using `printf '%s' "$VAR" | tr -d '\n\r'` before writing each value to $GITHUB_ENV. The values were already in the env: block, so only the sanitization step was missing.
+1. 'Set environment variables (unsigned commits)' step: Moved all four ${{ inputs.* }} expressions (git-author-name, git-author-email, git-committer-name, git-committer-email) out of the run: block and into the step's env: block. They are now referenced as plain shell variables ($GIT_AUTHOR_NAME, etc.) in the run: script, eliminating the script-injection risk.
 
-2. 'Set environment variables (unsigned commits)': Moved all four `${{ inputs.* }}` expressions out of the run: block into an env: block (GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL). Added the same newline sanitization using `printf '%s' "$VAR" | tr -d '\n\r'` before writing to $GITHUB_ENV. This fixes both the script-injection/static-inline-injection findings (expressions no longer directly interpolated in shell) and the github-env-injection finding (values sanitized before writing to GITHUB_ENV).
+2. Both 'Set environment variables (signed commits)' and 'Set environment variables (unsigned commits)' steps: Added newline sanitization before writing to $GITHUB_ENV. Each value is now sanitized with `printf '%s' "$VAR" | tr -d '\n\r'` into a `safe_*` variable before being echoed to $GITHUB_ENV, preventing github-env-injection attacks where a newline in a value could define arbitrary environment variables in subsequent steps.
 
