@@ -6,13 +6,13 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 ## Versions
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v25 | [`v25`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v25) | [`428c2b5`](https://github.com/DeterminateSystems/update-flake-lock/commit/428c2b58a4b7414dabd372acb6a03dba1084d3ab) |
-| v26 | [`v26`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v26) | [`9070c89`](https://github.com/DeterminateSystems/update-flake-lock/commit/9070c8924674eb79cc49246b8b6f2e14f4378eb0) |
-| v27 | [`v27`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v27) | [`c5930b3`](https://github.com/DeterminateSystems/update-flake-lock/commit/c5930b397a673a70ca70be06020e943aeac310a1) |
-| v28 | [`v28`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v28) | [`834c491`](https://github.com/DeterminateSystems/update-flake-lock/commit/834c491b2ece4de0bbd00d85214bb5e83b4da5c6) |
-| v29 | [`v29`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v29) | [`da03c0f`](https://github.com/DeterminateSystems/update-flake-lock/commit/da03c0f078bc4b2c37ee4f7e072d34bf8f188bb3) |
+| Version | Tag | Upstream commit | Hardening report |
+|---------|-----|-----------------|------------------|
+| v25 | [`v25`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v25) | [`428c2b5`](https://github.com/DeterminateSystems/update-flake-lock/commit/428c2b58a4b7414dabd372acb6a03dba1084d3ab) | [`HARDENING.md`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/blob/v25/HARDENING.md) |
+| v26 | [`v26`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v26) | [`9070c89`](https://github.com/DeterminateSystems/update-flake-lock/commit/9070c8924674eb79cc49246b8b6f2e14f4378eb0) | [`HARDENING.md`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/blob/v26/HARDENING.md) |
+| v27 | [`v27`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v27) | [`c5930b3`](https://github.com/DeterminateSystems/update-flake-lock/commit/c5930b397a673a70ca70be06020e943aeac310a1) | [`HARDENING.md`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/blob/v27/HARDENING.md) |
+| v28 | [`v28`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v28) | [`834c491`](https://github.com/DeterminateSystems/update-flake-lock/commit/834c491b2ece4de0bbd00d85214bb5e83b4da5c6) | [`HARDENING.md`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/blob/v28/HARDENING.md) |
+| v29 | [`v29`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/tree/v29) | [`da03c0f`](https://github.com/DeterminateSystems/update-flake-lock/commit/da03c0f078bc4b2c37ee4f7e072d34bf8f188bb3) | [`HARDENING.md`](https://github.com/chainguard-actions/DeterminateSystems-update-flake-lock/blob/v29/HARDENING.md) |
 
 ## Privacy
 
