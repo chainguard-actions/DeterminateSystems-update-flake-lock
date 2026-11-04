@@ -234,7 +234,7 @@ runs:
       run: rm -f pr_body.txt pr_body.template
     - name: Create PR
       id: create-pr
-      uses: chainguard-actions/peter-evans-create-pull-request@c6efddbd7b21d74b840d2bb96b268ec895894b4b # v8.1.1
+      uses: chainguard-actions/peter-evans-create-pull-request@621d7278aac3e4de12e01668e47481f3feac1231 # v8.1.1
       with:
         base: ${{ inputs.base }}
         branch: ${{ inputs.branch }}
