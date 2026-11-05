@@ -4,9 +4,13 @@
   "version": "v29",
   "commit_sha": "da03c0f078bc4b2c37ee4f7e072d34bf8f188bb3",
   "url": "https://github.com/DeterminateSystems/update-flake-lock",
-  "policy_sha": "d636be7e43ef829af6e853da6b3c7566db9f72fe",
+  "policy_sha": "374911c4be584df24e6da57af2d990570ef0f859",
   "test_policy_sha": "843adf9e4b8f85d0c08b27b9d0b09dd094b54702",
   "test_agent_version": "2",
   "harden_agent_version": "2",
-  "dependency_fingerprint": "sha256:c1b4f64ef52acf3c454d996f4c915fa1cc5c2ec53469ce5cfd65c5afeed69cc3"
+  "dist_artifact": {
+    "gcs_uri": "gs://patch-actions-node-artifacts/dist-artifacts/DeterminateSystems/update-flake-lock/v29/sha256-0af84faef5043cbdaab1f3bd88b32e2e124e6086dd00b52268a00ed713fdf725.tar.gz",
+    "sha256": "0af84faef5043cbdaab1f3bd88b32e2e124e6086dd00b52268a00ed713fdf725",
+    "size_bytes": 1325555
+  }
 }
