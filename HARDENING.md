@@ -4,55 +4,39 @@
 
 > This file was generated automatically by the hardening agent.
 
-**Policy SHA:** `d636be7e43ef829af6e853da6b3c7566db9f72fe`
+**Policy SHA:** `374911c4be584df24e6da57af2d990570ef0f859`
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
 **Harden Agent Version:** `2`
 
-Action **DeterminateSystems--update-flake-lock/v28** was hardened automatically. 6 finding(s) were identified and resolved across 1 iteration(s).
+Action **DeterminateSystems--update-flake-lock/v28** was hardened automatically. 8 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
-### script-injection (severity: high)
+### github-env-injection (severity: high)
 
-Rule (a) violation: The 'Set environment variables (unsigned commits)' run: block directly interpolates ${{ inputs.* }} expressions inside shell command strings. Specifically, `${{ inputs.git-author-name }}`, `${{ inputs.git-author-email }}`, `${{ inputs.git-committer-name }}`, and `${{ inputs.git-committer-email }}` are expanded by the Actions template engine before the shell ever sees them, allowing an attacker-controlled value to inject arbitrary shell commands. Offending lines:
-  echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV
-  echo "GIT_AUTHOR_EMAIL=<${{ inputs.git-author-email }}>" >> $GITHUB_ENV
-  echo "GIT_COMMITTER_NAME=${{ inputs.git-committer-name }}" >> $GITHUB_ENV
-  echo "GIT_COMMITTER_EMAIL=<${{ inputs.git-committer-email }}>" >> $GITHUB_ENV
+The step 'Set environment variables (signed commits)' writes GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME and GIT_COMMITTER_EMAIL to $GITHUB_ENV. These values come from steps.import-gpg.outputs.name/email through env vars. Newlines are not stripped first (no printf '%s' ... | tr -d '\n\r'), e.g. `echo "GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME" >> $GITHUB_ENV`.
 
 Locations:
 
-- `action.yml:145`
-- `action.yml:146`
-- `action.yml:147`
-- `action.yml:148`
+- `action.yml:130`
 
 ### github-env-injection (severity: high)
 
-Two run: blocks write untrusted values to $GITHUB_ENV without the required sanitization step (printf '%s' ... | tr -d '\n\r').
-
-(1) 'Set environment variables (signed commits)' step (lines ~137-140): Writes $GIT_AUTHOR_NAME, $GIT_AUTHOR_EMAIL, $GIT_COMMITTER_NAME, $GIT_COMMITTER_EMAIL to $GITHUB_ENV. These variables are sourced from steps.import-gpg.outputs.* (untrusted step outputs set via the env: block) and are forwarded without sanitization, e.g.:
-  echo "GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME" >> $GITHUB_ENV
-  echo "GIT_AUTHOR_EMAIL=<$GIT_AUTHOR_EMAIL>" >> $GITHUB_ENV
-
-(2) 'Set environment variables (unsigned commits)' step (lines ~145-148): Directly writes ${{ inputs.* }} values to $GITHUB_ENV without sanitization, e.g.:
-  echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV
-  echo "GIT_AUTHOR_EMAIL=<${{ inputs.git-author-email }}>" >> $GITHUB_ENV
-
-A newline injected into any of these values would allow an attacker to define arbitrary environment variables or override existing ones in subsequent steps.
+The step 'Set environment variables (unsigned commits)' writes inputs.git-author-name, git-author-email, git-committer-name and git-committer-email directly to $GITHUB_ENV with no sanitization, e.g. `echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV`. A newline in an input can inject arbitrary environment variables.
 
 Locations:
 
-- `action.yml:137`
 - `action.yml:138`
-- `action.yml:139`
-- `action.yml:140`
-- `action.yml:145`
-- `action.yml:146`
-- `action.yml:147`
-- `action.yml:148`
+
+### script-injection (severity: high)
+
+Rule (a): the run: block of the step 'Set environment variables (unsigned commits)' puts ${{ inputs.* }} expressions straight into the shell script, e.g. `echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV` (also inputs.git-author-email, git-committer-name, git-committer-email). Move them into env: and quote the expansions.
+
+Locations:
+
+- `action.yml:138`
 
 ### static-inline-injection (severity: high)
 
@@ -86,17 +70,105 @@ Locations:
 
 - `action.yml:142`
 
+### prior-fix (severity: high)
+
+Carried forward from this version's previous harden, which fixed it; fix it again unless the code no longer has the problem. The previous harden changed action.yml without recording a finding for it, and this analysis reported nothing there. Re-apply its security changes unless the code no longer needs them. The previous patch:
+```diff
+diff --git a/action.yml b/action.yml
+index 4182c25..3dae3d3 100644
+--- a/action.yml
++++ b/action.yml
+@@ -42,7 +42,6 @@ inputs:
+       GitHub Actions will not run workflows on pull requests which are opened by a GitHub Action.
+ 
+       **To run GitHub Actions workflows on this PR, close and re-open this pull request.**
+-
+   pr-labels:
+     description: "A comma or newline separated list of labels to set on the Pull Request to be created"
+     required: false
+@@ -107,10 +106,27 @@ outputs:
+ runs:
+   using: "composite"
+   steps:
+     - name: Import bot's GPG key for signing commits
+       if: ${{ inputs.sign-commits == 'true' }}
+       id: import-gpg
+       uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+       with:
+         gpg_private_key: ${{ inputs.gpg-private-key }}
+         fingerprint: ${{ inputs.gpg-fingerprint }}
+@@ -128,18 +144,31 @@ runs:
+         GIT_COMMITTER_EMAIL: ${{ steps.import-gpg.outputs.email }}
+         TARGETS: ${{ inputs.inputs }}
+       run: |
+-        echo "GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME" >> $GITHUB_ENV
+-        echo "GIT_AUTHOR_EMAIL=<$GIT_AUTHOR_EMAIL>" >> $GITHUB_ENV
+-        echo "GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME" >> $GITHUB_ENV
+-        echo "GIT_COMMITTER_EMAIL=<$GIT_COMMITTER_EMAIL>" >> $GITHUB_ENV
++        safe_author_name="$(printf '%s' "$GIT_AUTHOR_NAME" | tr -d '\n\r')"
++        safe_author_email="$(printf '%s' "$GIT_AUTHOR_EMAIL" | tr -d '\n\r')"
++        safe_committer_name="$(printf '%s' "$GIT_COMMITTER_NAME" | tr -d '\n\r')"
++        safe_committer_email="$(printf '%s' "$GIT_COMMITTER_EMAIL" | tr -d '\n\r')"
++        echo "GIT_AUTHOR_NAME=$safe_author_name" >> "$GITHUB_ENV"
++        echo "GIT_AUTHOR_EMAIL=<$safe_author_email>" >> "$GITHUB_ENV"
++        echo "GIT_COMMITTER_NAME=$safe_committer_name" >> "$GITHUB_ENV"
++        echo "GIT_COMMITTER_EMAIL=<$safe_committer_email>" >> "$GITHUB_ENV"
+     - name: Set environment variables (unsigned commits)
+       if: ${{ inputs.sign-commits != 'true' }}
+       shell: bash
++      env:
++        GIT_AUTHOR_NAME: ${{ inputs.git-author-name }}
++        GIT_AUTHOR_EMAIL: ${{ inputs.git-author-email }}
++        GIT_COMMITTER_NAME: ${{ inputs.git-committer-name }}
++        GIT_COMMITTER_EMAIL: ${{ inputs.git-committer-email }}
+       run: |
+-        echo "GIT_AUTHOR_NAME=${{ inputs.git-author-name }}" >> $GITHUB_ENV
+-        echo "GIT_AUTHOR_EMAIL=<${{ inputs.git-author-email }}>" >> $GITHUB_ENV
+-        echo "GIT_COMMITTER_NAME=${{ inputs.git-committer-name }}" >> $GITHUB_ENV
+-        echo "GIT_COMMITTER_EMAIL=<${{ inputs.git-committer-email }}>" >> $GITHUB_ENV
++        safe_author_name="$(printf '%s' "$GIT_AUTHOR_NAME" | tr -d '\n\r')"
++        safe_author_email="$(printf '%s' "$GIT_AUTHOR_EMAIL" | tr -d '\n\r')"
++        safe_committer_name="$(printf '%s' "$GIT_COMMITTER_NAME" | tr -d '\n\r')"
++        safe_committer_email="$(printf '%s' "$GIT_COMMITTER_EMAIL" | tr -d '\n\r')"
++        echo "GIT_AUTHOR_NAME=$safe_author_name" >> "$GITHUB_ENV"
++        echo "GIT_AUTHOR_EMAIL=<$safe_author_email>" >> "$GITHUB_ENV"
++        echo "GIT_COMMITTER_NAME=$safe_committer_name" >> "$GITHUB_ENV"
++        echo "GIT_COMMITTER_EMAIL=<$safe_committer_email>" >> "$GITHUB_ENV"
+     - name: Run update-flake-lock
+       shell: bash
+       run: node "$GITHUB_ACTION_PATH/dist/index.js"
+@@ -170,7 +199,7 @@ runs:
+         INPUT_TOKEN: ${{ inputs.token }}
+         INPUT__INTERNAL-STRICT-MODE: ${{ inputs._internal-strict-mode }}
+     - name: Save PR Body as file
+       uses: DamianReeves/write-file-action@6929a9a6d1807689191dcc8bbe62b54d70a32b42 # v1.3
+       with:
+         path: pr_body.template
+         contents: ${{ inputs.pr-body }}
+@@ -185,7 +214,7 @@ runs:
+         echo "$DELIMITER" >> $GITHUB_ENV
+         echo "GIT_COMMIT_MESSAGE is: ${COMMIT_MESSAGE}"
+     - name: Interpolate PR Body
+       uses: pedrolamas/handlebars-action@2995d7eadacbc8f2f6ab8431a01d84a5fa3b8bb4 # v2.4.0
+       with:
+         files: "pr_body.template"
+         output-filename: "pr_body.txt"
+@@ -202,7 +231,7 @@ runs:
+       run: rm -f pr_body.txt pr_
+... (truncated)
+```
+
+Locations:
+
+- `action.yml`
+
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, github-env-injection, static-inline-injection
+**Fixes applied:** github-env-injection, script-injection, static-inline-injection, prior-fix
 
 **Notes:**
 
-Fixed two steps in action.yml:
-
-1. 'Set environment variables (unsigned commits)' step: Moved all four ${{ inputs.* }} expressions (git-author-name, git-author-email, git-committer-name, git-committer-email) out of the run: block and into the step's env: block. They are now referenced as plain shell variables ($GIT_AUTHOR_NAME, etc.) in the run: script, eliminating the script-injection risk.
-
-2. Both 'Set environment variables (signed commits)' and 'Set environment variables (unsigned commits)' steps: Added newline sanitization before writing to $GITHUB_ENV. Each value is now sanitized with `printf '%s' "$VAR" | tr -d '\n\r'` into a `safe_*` variable before being echoed to $GITHUB_ENV, preventing github-env-injection attacks where a newline in a value could define arbitrary environment variables in subsequent steps.
+Fixed the two steps in action.yml that set the git author and committer variables. In the unsigned-commits step, the git-author/committer inputs now go through an env: block instead of being written straight into the script. In both the signed and unsigned steps, each value has newlines and carriage returns removed before it is written to $GITHUB_ENV, and $GITHUB_ENV is now quoted. The other changes from the previous harden (actions pinned to full commit SHAs) were already there, so I didn't change them.
 
